@@ -11,6 +11,10 @@ public class BaseTest {
     @BeforeMethod
     public void setup() {
         //WebDriverManager.chromedriver().setup();
+        WebDriverManager.chromedriver()
+                .clearDriverCache()
+                .clearResolutionCache()
+                .setup();
         driver = new ChromeDriver();
         driver.manage().window().maximize();
     }

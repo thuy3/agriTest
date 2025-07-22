@@ -50,7 +50,6 @@ import PageObjects.SpecialtyInfoPage;
 import org.testng.annotations.Test;
 import org.testng.Assert;
 import java.util.UUID;
-
 public class SpecialtyInfoTest extends BaseTest {
 
     @Test
@@ -77,7 +76,7 @@ public class SpecialtyInfoTest extends BaseTest {
                 "Xay nhuyễn, hấp, đóng gói",
                 "Không chất bảo quản",
                 "\"C:\\Users\\Admin\\Downloads\\cha_ca.jpg\"",
-                "\"C:\\Users\\Admin\\Downloads\\DADCC_NHOP_Factsheet.pdf\"" // Cần đường dẫn thực
+                "\"C:\\Users\\Admin\\Downloads\\DADCC_NHOP_Factsheet.pdf\""
         );
 
         specialtyInfoPage.clickSaveButton();
