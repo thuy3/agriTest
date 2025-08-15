@@ -14,7 +14,8 @@ public abstract class PostManagementPage {
 
     // Locator for parent menu
     private final By postManagementMenu = By.xpath("//span[text()='Quản lý bài viết']/parent::a");
-    private final By subMenuContainer = By.xpath("//a[@data-route='VI_MAIN/nso_post_forum']");
+    //private final By subMenuContainer = By.xpath("//a[@data-route='VI_MAIN/nso_post_forum']");
+    private final By subMenuContainer = By.xpath("//ul[@class='sub-menu mm-collapse mm-show']/li");
 
     public PostManagementPage(WebDriver driver) {
         this.driver = driver;

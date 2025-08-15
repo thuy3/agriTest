@@ -14,30 +14,31 @@ import java.util.logging.Logger;
 public class ForumPage extends PostManagementPage {
     private static final Logger LOGGER = Logger.getLogger(ForumPage.class.getName());
 
-    // Locators dựa trên HTML của danh sách và form thêm mới diễn đàn
+    // Locators
     private final By forumSubMenu = By.xpath("//a[@data-route='VI_MAIN/nso_post_forum']");
-    private final By newsPostSubMenu = By.xpath("//span[text()='Bài viết/Tin tức']/parent::a");
     private final By addNewButton = By.id("btn_new_entity");
-    private final By addFileButton = By.id("btn_add_doc");
     private final By titleField = By.id("title");
     private final By typeSelect = By.id("typ02");
-    private final By languageSelect = By.id("typ03");
-    private final By statusSelect = By.id("stat01");
-    private final By audienceSelect = By.id("stat02");
+//    private final By languageSelect = By.id("typ03");
+//    private final By statusSelect = By.id("stat01");
+//    private final By audienceSelect = By.id("stat02");
+    private final By authorField = By.id("inf01");
+    private final By publishDateField = By.id("dt03");
+    private final By summaryField = By.cssSelector("#div_blog_content01 .note-editable");
+    private final By contentField = By.cssSelector("#div_blog_content_lv1_area .note-editable");
     private final By saveButton = By.xpath("//button[contains(text(), 'Lưu')]");
+    private final By popupSaveButton = By.id("btn_msgbox_OK");
     private final By searchInput = By.id("inp_search");
     private final By clearSearchIcon = By.id("clear_icon");
     private final By filterIcon = By.id("filter_icon");
-    private final By statusFilterOptions = By.xpath("//ul[@class='dropdown-menu dropdown-menu-right']//div[@class='dropdown-item cursor-pointer font-size-18 user-typ-select']");
-    private final By fileUploadInput = By.xpath("//input[@data-name='files']");
-    private final By removeFileButton = By.xpath("//button[contains(text(), 'Remove file')]");
+    private final By statusFilterOptions = By.xpath("//ul[contains(@class, 'dropdown-menu')]//div[contains(@class, 'dropdown-item')]");
     private final By confirmButton = By.xpath("//button[contains(text(), 'Đồng ý')]");
-    //private final By alertMessage = By.xpath("//div[contains(@class, 'alert')]");
+    private final By detailPage = By.xpath("//div[contains(@class, 'd-flex align-items-center justify-content-between') and .//h5[text()='Thông tin bài viết']]");
     private final By alertMessage = By.xpath("//div[contains(@class, 'notifyjs-bootstrap-success')]//span[@data-notify-text]");
 
     public ForumPage(WebDriver driver) {
         super(driver);
-        this.wait = new WebDriverWait(driver, Duration.ofSeconds(90));
+        this.wait = new WebDriverWait(driver, Duration.ofSeconds(20));
     }
 
     public WebElement waitForElementNotStale(By locator) {
@@ -62,7 +63,7 @@ public class ForumPage extends PostManagementPage {
                     if (i == maxRetries - 1) {
                         throw new RuntimeException("Không thể click menu Diễn đàn sau " + maxRetries + " lần thử", e);
                     }
-                    Thread.sleep(2000);
+                    Thread.sleep(300);
                 }
             }
         } catch (Exception e) {
@@ -71,23 +72,69 @@ public class ForumPage extends PostManagementPage {
             throw new RuntimeException("Lỗi điều hướng đến Diễn đàn", e);
         }
     }
+
     public void navigateToAnotherMenu(String menuName) {
         try {
             LOGGER.info("Điều hướng đến menu: " + menuName);
-            By menuLocator = By.xpath("//span[text()='" + menuName + "']/parent::a");
-            WebElement menu = waitForElementNotStale(menuLocator);
-            if (menu.isDisplayed() && menu.isEnabled()) {
-                LOGGER.info("Click vào menu: " + menuName);
-                Actions actions = new Actions(driver);
-                actions.moveToElement(menu).pause(Duration.ofSeconds(2)).click().perform();
-                LOGGER.info("Đã điều hướng đến menu " + menuName + " thành công.");
-            } else {
-                throw new RuntimeException("Không thể tương tác với menu: " + menuName);
+            String dataRoute;
+            switch (menuName) {
+                case "Bài viết/Tin tức":
+                    dataRoute = "VI_MAIN/nso_post_news";
+                    break;
+                case "Diễn đàn":
+                    dataRoute = "VI_MAIN/nso_post_forum";
+                    break;
+                case "Nhóm diễn đàn":
+                    dataRoute = "VI_MAIN/nso_group_forum";
+                    break;
+                case "Quản lý lĩnh vực bài viết":
+                    dataRoute = "VI_MAIN/tpy_cat_news";
+                    break;
+                case "Văn bản pháp luật/hành chính":
+                    dataRoute = "VI_MAIN/nso_post_law";
+                    break;
+                default:
+                    throw new IllegalArgumentException("Menu không hợp lệ: " + menuName);
+            }
+            By menuLocator = By.xpath("//a[@data-route='" + dataRoute + "']");
+            int maxRetries = 3;
+            for (int i = 0; i < maxRetries; i++) {
+                try {
+                    driver.getCurrentUrl();
+                    WebElement menu = wait.until(ExpectedConditions.presenceOfElementLocated(menuLocator));
+                    String expectedUrlPart = menu.getAttribute("data-url");
+                    if (expectedUrlPart == null || expectedUrlPart.isEmpty()) {
+                        throw new RuntimeException("Không tìm thấy thuộc tính data-url cho menu " + menuName);
+                    }
+                    LOGGER.info("HTML của menu " + menuName + ": " + menu.getAttribute("outerHTML"));
+                    Rectangle rect = menu.getRect();
+                    LOGGER.info("Trạng thái menu: displayed=" + menu.isDisplayed() +
+                            ", enabled=" + menu.isEnabled() +
+                            ", x=" + rect.getX() + ", y=" + rect.getY() +
+                            ", width=" + rect.getWidth() + ", height=" + rect.getHeight());
+                    wait.until(ExpectedConditions.elementToBeClickable(menuLocator));
+                    Actions actions = new Actions(driver);
+                    actions.moveToElement(menu).pause(Duration.ofSeconds(1)).click().perform();
+                    wait.until(ExpectedConditions.urlContains(expectedUrlPart));
+                    LOGGER.info("Đã điều hướng đến menu " + menuName + " thành công.");
+                    return;
+                } catch (StaleElementReferenceException | ElementClickInterceptedException | TimeoutException e) {
+                    LOGGER.warning("Lần thử " + (i + 1) + ": Lỗi khi click menu " + menuName + ": " + e.getMessage());
+                    if (i == maxRetries - 1) {
+                        capturePageSource("C:\\test\\resources\\error_navigate_menu_" + menuName.replaceAll("[^a-zA-Z0-9]", "_") + ".html");
+                        throw new RuntimeException("Không thể điều hướng đến menu " + menuName + " sau " + maxRetries + " lần thử", e);
+                    }
+                    Thread.sleep(500);
+                } catch (NoSuchSessionException e) {
+                    LOGGER.severe("Session bị ngắt: " + e.getMessage());
+                    capturePageSource("C:\\test\\resources\\error_session_" + menuName.replaceAll("[^a-zA-Z0-9]", "_") + ".html");
+                    throw new RuntimeException("Session bị ngắt khi điều hướng đến menu " + menuName, e);
+                }
             }
         } catch (Exception e) {
             LOGGER.severe("Lỗi khi điều hướng đến menu " + menuName + ": " + e.getMessage());
             capturePageSource("C:\\test\\resources\\error_navigate_menu_" + menuName.replaceAll("[^a-zA-Z0-9]", "_") + ".html");
-            throw e;
+            throw new RuntimeException("Lỗi điều hướng đến menu " + menuName, e);
         }
     }
 
@@ -104,80 +151,107 @@ public class ForumPage extends PostManagementPage {
         }
     }
 
-    public void clickAddFile() {
-        try {
-            WebElement addFileBtn = waitForElementNotStale(addFileButton);
-            ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", addFileBtn);
-            addFileBtn.click();
-            wait.until(ExpectedConditions.visibilityOfElementLocated(fileUploadInput));
-            LOGGER.info("Đã nhấn nút Thêm tệp.");
-        } catch (Exception e) {
-            LOGGER.severe("Lỗi khi nhấn Thêm tệp: " + e.getMessage());
-            throw e;
-        }
-    }
-
     public void fillForumInfo(Map<String, String> forumData) {
         try {
-            if (forumData.containsKey("title")) {
-                WebElement title = waitForElementNotStale(titleField);
-                title.clear();
-                title.sendKeys(forumData.get("title"));
+            int retries = 3;
+            for (int i = 0; i < retries; i++) {
+                try {
+                    if (forumData.containsKey("title")) {
+                        WebElement title = waitForElementNotStale(titleField);
+                        title.clear();
+                        title.sendKeys(forumData.get("title"));
+                    }
+                    if (forumData.containsKey("author")) {
+                        WebElement author = waitForElementNotStale(authorField);
+                        author.clear();
+                        author.sendKeys(forumData.get("author"));
+                    }
+                    if (forumData.containsKey("publishDate")) {
+                        WebElement date = waitForElementNotStale(publishDateField);
+                        ((JavascriptExecutor) driver).executeScript("arguments[0].value = arguments[1]; arguments[0].dispatchEvent(new Event('change'));", date, forumData.get("publishDate"));
+                    }
+                    if (forumData.containsKey("summary")) {
+                        WebElement summary = waitForElementNotStale(summaryField);
+                        ((JavascriptExecutor) driver).executeScript("arguments[0].innerHTML = arguments[1];", summary, forumData.get("summary"));
+                    }
+                    if (forumData.containsKey("content")) {
+                        WebElement content = waitForElementNotStale(contentField);
+                        ((JavascriptExecutor) driver).executeScript("arguments[0].innerHTML = arguments[1];", content, forumData.get("content"));
+                    }
+                    LOGGER.info("Đã điền thông tin diễn đàn.");
+                    return;
+                } catch (StaleElementReferenceException | ElementClickInterceptedException | TimeoutException e) {
+                    if (i == retries - 1) {
+                        capturePageSource("C:\\test\\resources\\error_enter_post_details_" + System.currentTimeMillis() + ".html");
+                        throw new RuntimeException("Không thể điền thông tin sau " + retries + " lần thử", e);
+                    }
+                    Thread.sleep(200);
+                }
             }
-            if (forumData.containsKey("type")) {
-                WebElement type = waitForElementNotStale(typeSelect);
-                Select typeDropdown = new Select(type);
-                typeDropdown.selectByValue(forumData.get("type"));
-            }
-            if (forumData.containsKey("language")) {
-                WebElement language = waitForElementNotStale(languageSelect);
-                Select languageDropdown = new Select(language);
-                languageDropdown.selectByValue(forumData.get("language"));
-            }
-            if (forumData.containsKey("status")) {
-                WebElement status = waitForElementNotStale(statusSelect);
-                Select statusDropdown = new Select(status);
-                statusDropdown.selectByValue(forumData.get("status"));
-            }
-            if (forumData.containsKey("audience")) {
-                WebElement audience = waitForElementNotStale(audienceSelect);
-                Select audienceDropdown = new Select(audience);
-                audienceDropdown.selectByValue(forumData.get("audience"));
-            }
-            LOGGER.info("Đã điền thông tin diễn đàn.");
         } catch (Exception e) {
             LOGGER.severe("Lỗi khi điền thông tin: " + e.getMessage());
-            throw e;
+            throw new RuntimeException("Lỗi khi điền thông tin diễn đàn", e);
         }
     }
 
-    public String clickSave() {
+//    public String clickSave() {
+//        try {
+//            WebElement saveBtn = wait.until(ExpectedConditions.elementToBeClickable(saveButton));
+//            ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true); arguments[0].click();", saveBtn);
+//
+//            WebElement popupSaveBtn = wait.until(ExpectedConditions.elementToBeClickable(popupSaveButton));
+//            ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true); arguments[0].click();", popupSaveBtn);
+//
+//            WebElement alert = wait.until(ExpectedConditions.visibilityOfElementLocated(alertMessage));
+//            return alert.getText();
+//        } catch (Exception e) {
+//            LOGGER.severe("Lỗi khi nhấn nút Lưu: " + e.getMessage());
+//            capturePageSource("C:\\test\\resources\\error_click_save_" + System.currentTimeMillis() + ".html");
+//            throw new RuntimeException("Lỗi khi nhấn nút Lưu", e);
+//        }
+//    }
+
+    public void clickSave() {
         try {
-            WebElement saveBtn = waitForElementNotStale(saveButton);
-            ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", saveBtn);
-            saveBtn.click();
-            try {
-                WebElement alert = wait.until(ExpectedConditions.visibilityOfElementLocated(alertMessage));
-                String alertText = alert.getText();
-                LOGGER.info("Thông báo sau khi lưu: " + alertText);
-                return alertText;
-            } catch (TimeoutException e) {
-                LOGGER.info("Không có thông báo xuất hiện sau khi lưu.");
-                return "";
-            }
+            WebElement saveBtn = wait.until(ExpectedConditions.elementToBeClickable(saveButton));
+            ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true); arguments[0].click();", saveBtn);
+            WebElement popupSaveBtn = wait.until(ExpectedConditions.elementToBeClickable(popupSaveButton));
+            ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true); arguments[0].click();", popupSaveBtn);
         } catch (Exception e) {
-            LOGGER.severe("Lỗi khi nhấn Lưu: " + e.getMessage());
-            throw e;
+            LOGGER.severe("Lỗi khi nhấn nút Lưu: " + e.getMessage());
+            capturePageSource("C:\\test\\resources\\error_click_save_" + System.currentTimeMillis() + ".html");
+            throw new RuntimeException("Lỗi khi nhấn nút Lưu", e);
         }
     }
+
+    public String getAlertMessage() {
+        try {
+            WebElement alert = wait.until(ExpectedConditions.visibilityOfElementLocated(alertMessage));
+            return alert.getText();
+        } catch (TimeoutException e) {
+            return "";
+        }
+    }
+
+
+//    public boolean isRequiredFieldAlertDisplayed() {
+//        try {
+//            WebElement alert = wait.until(ExpectedConditions.visibilityOfElementLocated(
+//                    By.cssSelector("div.errMsg")));
+//            return alert.isDisplayed();
+//        } catch (TimeoutException e) {
+//            LOGGER.info("Không tìm thấy thông báo bắt buộc.");
+//            return false;
+//        }
+//    }
 
     public boolean isRequiredFieldAlertDisplayed() {
         try {
             WebElement alert = wait.until(ExpectedConditions.visibilityOfElementLocated(
-                    By.xpath("//div[contains(text(), 'Thông tin bắt buộc!')]")));
+                    By.xpath("//div[contains(text(), 'Thông tin bắt buộc')]")));
             return alert.isDisplayed();
         } catch (TimeoutException e) {
-            LOGGER.info("Không tìm thấy thông báo bắt buộc.");
+            LOGGER.info("Không tìm thấy thông báo bắt buộc");
             return false;
         }
     }
@@ -234,75 +308,15 @@ public class ForumPage extends PostManagementPage {
         wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//div[@class='card-body']")));
     }
 
-    public String uploadFile(String filePath) {
+    public boolean isDocumentDetailDisplayed() {
         try {
-            clickAddFile();
-            WebElement uploadInput = waitForElementNotStale(fileUploadInput);
-            uploadInput.sendKeys(filePath);
-            WebElement confirmBtn = waitForElementNotStale(confirmButton);
-            confirmBtn.click();
-            WebElement alert = wait.until(ExpectedConditions.visibilityOfElementLocated(
-                    By.xpath("//div[contains(text(), 'Cập nhật thành công!')]")));
-            String alertText = alert.getText();
-            LOGGER.info("Thông báo sau khi upload: " + alertText);
-            return alertText;
-        } catch (Exception e) {
-            LOGGER.severe("Lỗi khi upload file: " + e.getMessage());
-            return "";
-        }
-    }
-
-    public String removeUploadedFile() {
-        try {
-            WebElement removeBtn = waitForElementNotStale(removeFileButton);
-            removeBtn.click();
-            WebElement confirmBtn = waitForElementNotStale(confirmButton);
-            confirmBtn.click();
-            WebElement alert = wait.until(ExpectedConditions.visibilityOfElementLocated(
-                    By.xpath("//div[contains(text(), 'Các tệp tin đã được xóa thành công')]")));
-            String alertText = alert.getText();
-            LOGGER.info("Thông báo sau khi xóa file: " + alertText);
-            return alertText;
-        } catch (Exception e) {
-            LOGGER.severe("Lỗi khi xóa file: " + e.getMessage());
-            return "";
-        }
-    }
-
-    public String uploadLargeFile(String filePath) {
-        try {
-            clickAddFile();
-            WebElement uploadInput = waitForElementNotStale(fileUploadInput);
-            uploadInput.sendKeys(filePath);
-            WebElement confirmBtn = waitForElementNotStale(confirmButton);
-            confirmBtn.click();
-            WebElement alert = wait.until(ExpectedConditions.visibilityOfElementLocated(
-                    By.xpath("//div[contains(text(), 'Dung lượng file quá lớn')]")));
-            String alertText = alert.getText();
-            LOGGER.info("Thông báo sau khi upload file lớn: " + alertText);
-            return alertText;
-        } catch (Exception e) {
-            LOGGER.severe("Lỗi khi upload file lớn: " + e.getMessage());
-            return "";
-        }
-    }
-
-    public boolean verifyDateValidation(String publishDate) {
-        try {
-            WebElement title = waitForElementNotStale(titleField);
-            title.sendKeys("Test Forum");
-            WebElement type = waitForElementNotStale(typeSelect);
-            Select typeDropdown = new Select(type);
-            typeDropdown.selectByValue("105100");
-            WebElement audience = waitForElementNotStale(audienceSelect);
-            Select audienceDropdown = new Select(audience);
-            audienceDropdown.selectByValue("100");
-            ((JavascriptExecutor) driver).executeScript("document.getElementById('publishDate').value = '" + publishDate + "';");
-            WebElement saveBtn = waitForElementNotStale(saveButton);
-            saveBtn.click();
-            return true;
-        } catch (Exception e) {
-            LOGGER.severe("Lỗi khi kiểm tra ngày đăng: " + e.getMessage());
+            WebElement detail = wait.until(ExpectedConditions.visibilityOfElementLocated(detailPage));
+            LOGGER.info("Trang chi tiết văn bản hiển thị.");
+            return detail.isDisplayed();
+        } catch (TimeoutException e) {
+            LOGGER.info("Không tìm thấy trang chi tiết văn bản.");
+//            capturePageSource("C:\\test\\resources\\error_detail_page.html");
+//            captureScreenshot("C:\\test\\resources\\screenshots\\error_detail_page.png");
             return false;
         }
     }
